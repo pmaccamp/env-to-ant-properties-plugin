@@ -59,6 +59,11 @@ public class EnvToAntPropertiesFileBuildWrapper extends BuildWrapper {
             nodeName = build.getBuiltOn().toComputer().getHostName();
         } catch (Exception e) {
             System.err.println("Unable to automatically determine hostname when writing constants.properties");
+        }
+        
+        // Handle case where getHostName returns null or an exception by falling back to the nodeName
+        if(nodeName == null)
+        {
             nodeName = build.getBuiltOn().getNodeName();
             // If this was the master node
             if (nodeName == null || nodeName == "") {
@@ -67,7 +72,6 @@ public class EnvToAntPropertiesFileBuildWrapper extends BuildWrapper {
                 nodeName = addr.getHostName();
             }
         }
-
         //convert C:/ to C$/, replace and variables, and prepend the build node (use getEnvVars to ensure WORKSPACE is included)
         String nodePath = "//" + nodeName + "/" + replaceEnvVars(build.getEnvVars(), propertiesFile.getPath()).replaceFirst(":", "\\$");
 
