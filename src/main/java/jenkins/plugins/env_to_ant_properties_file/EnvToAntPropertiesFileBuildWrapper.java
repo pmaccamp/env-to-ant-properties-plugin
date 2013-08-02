@@ -1,14 +1,15 @@
 package jenkins.plugins.env_to_ant_properties_file;
 
 import hudson.Extension;
+import hudson.FilePath;
 import hudson.Launcher;
 import hudson.model.AbstractBuild;
 import hudson.model.AbstractProject;
 import hudson.model.BuildListener;
+import hudson.model.Hudson;
 import hudson.tasks.BuildWrapper;
 import hudson.tasks.BuildWrapperDescriptor;
 
-import org.apache.commons.io.FileUtils;
 import org.kohsuke.stapler.DataBoundConstructor;
 
 import java.io.*;
@@ -16,7 +17,6 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.net.InetAddress;
 
 public class EnvToAntPropertiesFileBuildWrapper extends BuildWrapper {
 
@@ -45,7 +45,7 @@ public class EnvToAntPropertiesFileBuildWrapper extends BuildWrapper {
     public Environment setUp(final AbstractBuild build, final Launcher launcher, final BuildListener listener)
             throws IOException, InterruptedException {
         //getBuildVariables leaves out system variables, including the workspace
-        Map envVars = build.getBuildVariables();
+        final Map envVars = build.getBuildVariables();
         try {
             envVars.put("JOB_NAME", build.getEnvironment().get("JOB_NAME"));
             envVars.put("P4_CHANGELIST", build.getEnvironment().get("P4_CHANGELIST"));
@@ -53,38 +53,16 @@ public class EnvToAntPropertiesFileBuildWrapper extends BuildWrapper {
             //Variable did not exist
         }
 
-        // Get hostname
-        String nodeName = null;
-        try {
-            nodeName = build.getBuiltOn().toComputer().getHostName();
-        } catch (Exception e) {
-            System.err.println("Unable to automatically determine hostname when writing constants.properties");
-        }
-        
-        // Handle case where getHostName returns null or an exception by falling back to the nodeName
-        if(nodeName == null)
-        {
-            nodeName = build.getBuiltOn().getNodeName();
-            // If this was the master node
-            if (nodeName == null || nodeName == "") {
-                // Get the current hostname which will always be the master
-                InetAddress addr = InetAddress.getLocalHost();
-                nodeName = addr.getHostName();
-            }
-        }
-        //convert C:/ to C$/, replace and variables, and prepend the build node (use getEnvVars to ensure WORKSPACE is included)
-        String nodePath = "//" + nodeName + "/" + replaceEnvVars(build.getEnvVars(), propertiesFile.getPath()).replaceFirst(":", "\\$");
-
         listener.getLogger().print("Writing environment variables to properties file.  ");
 
-        //Replace any environment variables in the properties file path
-        File expandedPropertiesFile = new File(nodePath);
-
+        FilePath nodePath = new FilePath(build.getWorkspace(), propertiesFile.getPath());
         //Print out the path to the file
-        listener.getLogger().println("\"file:" + nodePath + "\"");
+        listener.getLogger().println(Hudson.getInstance().getRootUrl()
+                + build.getParent().getUrl() + "ws/"
+                + propertiesFile.getPath().replaceAll("\\\\", "/") + "/*view*");
 
         //Create the file and write the current variables to it
-        PrintWriter writer = new PrintWriter(new FileWriter(expandedPropertiesFile));
+        PrintWriter writer = new PrintWriter(nodePath.write());
         Iterator it = envVars.entrySet().iterator();
         while (it.hasNext()) {
             Map.Entry entry = (Map.Entry) it.next();
