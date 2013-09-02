@@ -56,10 +56,20 @@ public class EnvToAntPropertiesFileBuildWrapper extends BuildWrapper {
         listener.getLogger().print("Writing environment variables to properties file.  ");
 
         FilePath nodePath = new FilePath(build.getWorkspace(), propertiesFile.getPath());
+
+        String jenkinsRoot = Hudson.getInstance().getRootUrl();
+
+        if (jenkinsRoot == null) {
+            jenkinsRoot = "http://localhost:8080/";
+        }
+
+        String propertiesFileURL = jenkinsRoot
+                + build.getParent().getUrl()
+                + "ws/" + URLParamEncoder.encode(propertiesFile.getPath().replaceAll("\\\\", "/"))
+                + "/*view*";
         //Print out the path to the file
-        listener.getLogger().println(Hudson.getInstance().getRootUrl()
-                + build.getParent().getUrl() + "ws/"
-                + propertiesFile.getPath().replaceAll("\\\\", "/") + "/*view*");
+        listener.hyperlink(propertiesFileURL, propertiesFileURL);
+        listener.getLogger().println("");
 
         //Create the file and write the current variables to it
         PrintWriter writer = new PrintWriter(nodePath.write());
@@ -104,5 +114,33 @@ public class EnvToAntPropertiesFileBuildWrapper extends BuildWrapper {
 
     public void setPropertiesFile(File propertiesFile) {
         this.propertiesFile = propertiesFile;
+    }
+
+    public static class URLParamEncoder {
+
+        public static String encode(String input) {
+            StringBuilder resultStr = new StringBuilder();
+            for (char ch : input.toCharArray()) {
+                if (isUnsafe(ch)) {
+                    resultStr.append('%');
+                    resultStr.append(toHex(ch / 16));
+                    resultStr.append(toHex(ch % 16));
+                } else {
+                    resultStr.append(ch);
+                }
+            }
+            return resultStr.toString();
+        }
+
+        private static char toHex(int ch) {
+            return (char) (ch < 10 ? '0' + ch : 'A' + ch - 10);
+        }
+
+        private static boolean isUnsafe(char ch) {
+            if (ch > 128 || ch < 0) {
+                return true;
+            }
+            return " %$&+,/:;=?@<>#%".indexOf(ch) >= 0;
+        }
     }
 }
